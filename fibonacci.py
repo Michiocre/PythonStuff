@@ -3,7 +3,7 @@ f0 = 0
 f1 = 1
 
 #upper limit
-limit = 100
+limit = 10000000
 
 for i in range(limit - 1):
     x = f1 + f0
