@@ -1,5 +1,0 @@
-﻿  SocketClient.cpp
-d:\projekts\other\leicafernbedienung\socketclient\socketclient\socketclient.cpp(4): warning C4603: 'WIN32_LEAN_AND_MEAN': macro is not defined or definition is different after precompiled header use
-  d:\projekts\other\leicafernbedienung\socketclient\socketclient\socketclient.cpp(4): note: Add macro to precompiled header instead of defining here
-  d:\projekts\other\leicafernbedienung\socketclient\socketclient\socketclient.cpp(7): note: use of precompiled header
-  SocketClient.vcxproj -> D:\Projekts\Other\LeicaFernbedienung\SocketClient\Debug\SocketClient.exe
