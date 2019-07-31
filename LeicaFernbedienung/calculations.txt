@@ -1,0 +1,14 @@
+5V
+
+74 Leds
+
+1m
+
+~30-60mA je Led
+ (normal 50mA)
+
+-> 3700mA = 3,4 A
+
+Molex = 11A/5V -> Perfect geeignet
+
+
