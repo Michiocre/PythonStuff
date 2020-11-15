@@ -14,8 +14,11 @@ sessions = AudioUtilities.GetAllSessions()
 clear = lambda: os.system('cls')
 print("Press F6 to start the Zombie killing script, F7 for the fishing script. Press F12 to close this programm.")
 
+def emptyFunction():
+    return
+
 class ClickerThread(threading.Thread):
-    def __init__(self, name, delay, button, button2 = None, extraFunction = None):
+    def __init__(self, name, delay, button, button2 = None, extraFunction = emptyFunction):
         super(ClickerThread, self).__init__()
         self.delay = delay
         self.button = button
