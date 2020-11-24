@@ -18,7 +18,7 @@ found = False
 for i in range(generationsNum):
     if i < generationsNum:
         generations.append([])
-        nextPop = int(currentPop - (popGrowth*currentPop));
+        nextPop = int(currentPop - (popGrowth*currentPop))
         if nextPop <= 2:
             generationsNum = i
             break
@@ -43,7 +43,8 @@ for i in range(generationsNum):
                 for decendent in generations[i2][j]['decendents']:
                     generations[i2+1][parent]['decendents'].add(decendent)
                 if len(generations[i2+1][parent]['decendents']) == startPop and found == False:
-                    print('Gen', i, ' done | First common ancestor if you go back ',i2+1,' Generations')
+                    print(
+                        'Gen', i, ' done | First common ancestor if you go back ', i2+1, ' Generations')
                     found = True
                     break
             if found:
@@ -54,4 +55,5 @@ for i in range(generationsNum):
         generations[i2] = None
     print('Gen', i, ' done')
 if found == False:
-    print('No common ancesters found after ',generationsNum -1,' Generations')
+    print('No common ancesters found after ',
+          generationsNum - 1, ' Generations')

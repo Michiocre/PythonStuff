@@ -11,14 +11,18 @@ f_start_stop_key = pynput.keyboard.Key.f7
 exit_key = pynput.keyboard.Key.f12
 
 sessions = AudioUtilities.GetAllSessions()
-clear = lambda: os.system('cls')
+def clear(): return os.system('cls')
+
+
 print("Press F6 to start the Zombie killing script, F7 for the fishing script. Press F12 to close this programm.")
+
 
 def emptyFunction():
     return
 
+
 class ClickerThread(threading.Thread):
-    def __init__(self, name, delay, button, button2 = None, extraFunction = emptyFunction):
+    def __init__(self, name, delay, button, button2=None, extraFunction=emptyFunction):
         super(ClickerThread, self).__init__()
         self.delay = delay
         self.button = button
@@ -67,6 +71,7 @@ class ClickerThread(threading.Thread):
                 time.sleep(self.delay)
             time.sleep(0.1)
 
+
 def swapOffHand():
     keyboard.press('f')
     time.sleep(0.1)
@@ -79,11 +84,13 @@ def swapOffHand():
 
 mouse = pynput.mouse.Controller()
 keyboard = pynput.keyboard.Controller()
-zClick_thread = ClickerThread("ZombieScript", 5, pynput.mouse.Button.left, pynput.mouse.Button.right, swapOffHand)
+zClick_thread = ClickerThread(
+    "ZombieScript", 5, pynput.mouse.Button.left, pynput.mouse.Button.right, swapOffHand)
 zClick_thread.start()
 
 fClick_thread = ClickerThread("FishingScript", 1, pynput.mouse.Button.right)
 fClick_thread.start()
+
 
 def on_press(key):
     if key == z_start_stop_key:
@@ -104,6 +111,7 @@ def on_press(key):
         fClick_thread.exit()
         zClick_thread.exit()
         listener.stop()
+
 
 with pynput.keyboard.Listener(on_press=on_press) as listener:
     listener.join()
