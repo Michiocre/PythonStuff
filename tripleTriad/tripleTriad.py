@@ -1,20 +1,22 @@
-import numbers
 import sys
 import os
 import time
 import math
 import argparse
 import json
+import copy
 import numpy as np
 import pyautogui
 import win32api
 import cv2
 import pytesseract
+import random
 from pathlib import Path
 from datetime import datetime
 from PIL import ImageGrab, Image, ImageStat
 from distutils.dir_util import copy_tree 
 import matplotlib.pyplot as plt
+
 
 key1 = 0
 key0 = 0
@@ -39,127 +41,141 @@ def key0Update():
     key0Old = key0
     return val
 
-def playCard(deckI, boardI):
-    if not board[boardI] is None:
-        return False
-    if myDeck[deckI] is None:
-        return False
-        
-    board[boardI] = [True, myDeck[deckI]]
-    myDeck[deckI] = None
-            
-    x = boardI % 3
-    y = math.floor(boardI / 3)
+def boardFull(board):
+        for y in range(len(board)):
+            for x in range(len(board[y])):
+                if board[y][x]['values'] is None:
+                    return False
+        return True
 
-    if x - 1 >= 0 and board[boardI - 1] is not None:
-        if board[boardI][1][0] > board[boardI - 1][1][2]:
-            board[boardI - 1][0] = True
-    if x + 1 <= 2 and board[boardI + 1] is not None:
-        if board[boardI][1][2] > board[boardI + 1][1][0]:
-            board[boardI + 1][0] = True
-    if y - 1 >= 0 and board[boardI - 3] is not None:
-        if board[boardI][1][1] > board[boardI - 3][1][3]:
-            board[boardI - 3][0] = True
-    if y + 1 <= 2 and board[boardI + 3] is not None:
-        if board[boardI][1][3] > board[boardI + 3][1][1]:
-            board[boardI + 3][0] = True
-    return True
-
-def enemyCard(deckI, boardI):
-    if not board[boardI] is None:
-        return False
-    if enemyDeck[deckI] is None:
-        return False
-        
-    board[boardI] = [False, enemyDeck[deckI]]
-    enemyDeck[deckI] = None
-
-    x = boardI % 3
-    y = math.floor(boardI / 3)
-
-    if x - 1 >= 0 and board[boardI - 1] is not None:
-        if board[boardI][1][0] > board[boardI - 1][1][2]:
-            board[boardI - 1][0] = False
-    if x + 1 <= 2 and board[boardI + 1] is not None:
-        if board[boardI][1][2] > board[boardI + 1][1][0]:
-            board[boardI + 1][0] = False
-    if y - 1 >= 0 and board[boardI - 3] is not None:
-        if board[boardI][1][1] > board[boardI - 3][1][3]:
-            board[boardI - 3][0] = False
-    if y + 1 <= 2 and board[boardI + 3] is not None:
-        if board[boardI][1][3] > board[boardI + 3][1][1]:
-            board[boardI + 3][0] = False
-    return True
-
-def getScore():
+def getScore(board):
     score = 0
-    for i in range(len(board)):
-        if board[i] is not None:
-            if (board[i][0]):
-                score += 1
+    for y in range(len(board)):
+        for x in range(len(board[y])):
+            if board[y][x]['values'] is not None:
+                if board[y][x]['owner'] == 'player':
+                    score += 1
+                else:
+                    score -= 1
     return score
 
-def boardFull():
-    for i in range(len(board)):
-        if board[i] is None:
-            return False
-    return True
+def playCard(board, decks, player, x, y, i, rules):
+    board[y][x]['values'] = decks[player][i]['values']
+    board[y][x]['owner'] = player
 
-def minmax(depth):
-    global board, myDeck
-    oldBoard = board.copy()
-    oldDeck = myDeck.copy()
-    best = [None, None, -1]
-    for deckI in range(len(myDeck)):
-        if myDeck[deckI] is None:
+    decks[player][i]['values'] = None
+
+    swaps = []
+
+    if y > 0:
+        if board[y - 1][x]['values'] is not None:
+            if board[y][x]['values']['up'] > board[y - 1][x]['values']['down']:
+                board[y - 1][x]['owner'] = player
+                swaps.append([y-1, x])
+    if y < 2:
+        if board[y + 1][x]['values'] is not None:
+            if board[y][x]['values']['down'] > board[y + 1][x]['values']['up']:
+                board[y + 1][x]['owner'] = player
+                swaps.append([y-1, x])
+    if x > 0:
+        if board[y][x - 1]['values'] is not None:
+            if board[y][x]['values']['left'] > board[y][x - 1]['values']['right']:
+                board[y][x - 1]['owner'] = player
+                swaps.append([y, x - 1])
+    if x < 2:
+        if board[y][x + 1]['values'] is not None:
+            if board[y][x]['values']['right'] > board[y][x + 1]['values']['left']:
+                board[y][x + 1]['owner'] = player
+                swaps.append([y, x + 1])
+
+    return swaps
+
+def undoPlay(board, decks, player, x, y, i, swaps):
+    decks[player][i]['values'] = board[y][x]['values']
+    board[y][x]['owner'] = None
+    board[y][x]['values'] = None
+
+    for swapI in range(len(swaps)):
+        board[swaps[swapI][0]][swaps[swapI][1]]['owner'] = 'enemy' if player == 'player' else 'player'
+
+def getExposedSides(board, x, y):
+    sidesOpen = 0
+    sum = 0
+    if y > 0:
+        if board[y - 1][x]['values'] is None:
+            sidesOpen += 1
+            sum += board[y][x]['values']['up']
+    if y < 2:
+        if board[y + 1][x]['values'] is None:
+            sidesOpen += 1
+            sum += board[y][x]['values']['down']
+    if x > 0:
+        if board[y][x - 1]['values'] is None:
+            sidesOpen += 1
+            sum += board[y][x]['values']['left']
+    if x < 2:
+        if board[y][x + 1]['values'] is None:
+            sidesOpen += 1
+            sum += board[y][x]['values']['right']
+    if sidesOpen == 0:
+        return 10000
+    return sum / sidesOpen
+
+def minmax(board, decks, player, depth, maxDepth, rules):
+    scores = []
+
+    for i in range(len(decks[player])):
+        if decks[player][i]['values'] is None:
             continue
-        if chaos and myDeck[deckI][4] < 60 and depth == 0:
-                continue
+        if depth == 0 and rules['chaos'] == True and not decks[player][i]['active']:
+            continue
+        for y in range(len(board)):
+            for x in range(len(board[y])):
+                if board[y][x]['values'] is not None:
+                    continue
 
-        for boardI in range(len(board)):
-            if not playCard(deckI, boardI):
-                continue
-            
-            if boardFull() or depth == 4:
-                score = getScore()
-            else: 
-                score = minmaxEnemy(depth + 1)[2]
+                swaps = playCard(board, decks, player, x, y, i, rules)
 
-            #print('    ' * depth, deckI, boardI, score)    
-            
-            if score > best[2]:
-                best[0] = deckI
-                best[1] = boardI
-                best[2] = score
-            board = oldBoard.copy()
-            myDeck = oldDeck.copy()
-    return best
+                score = getScore(board)
+                exposedValues = getExposedSides(board, x, y)
+                
+                # print([[i, x, y], score])
+                # print(board)
 
-def minmaxEnemy(depth):
-    global board, enemyDeck
-    oldBoard = board.copy()
-    oldEDeck = enemyDeck.copy()
-    best = [None, None, 10000000]
-    for deckI in range(len(enemyDeck)):
-        for boardI in range(len(board)):
-            if not enemyCard(deckI, boardI):
-                continue
+                if boardFull(board) or depth >= maxDepth:
+                    scores.append([[i, x, y], score, exposedValues])
+                else:
+                    futureMove = minmax(board, decks, 'enemy' if player == 'player' else 'player', depth + 1, maxDepth, rules)
+                    scores.append([[i, x, y], futureMove[1], exposedValues])
 
-            if boardFull() or depth == 3:
-                score = getScore()
-            else: 
-                score = minmax(depth + 1)[2]
+                undoPlay(board, decks, player, x, y, i, swaps)
 
-            #print('    ' * depth, deckI, boardI, score)   
+    best = None
 
-            if score < best[2]:
-                best[0] = deckI
-                best[1] = boardI
-                best[2] = score
-            
-            board = oldBoard.copy()
-            enemyDeck = oldEDeck.copy()
-    return best
+    for i in range(len(scores)):
+        if best is None:
+            best = i
+            continue
+        if player == 'player':
+            if scores[best][1] < scores[i][1]:
+                best = i
+            elif scores[best][1] == scores[i][1]:
+                if scores[best][2] < scores[i][2]:
+                    best = i
+        else: 
+            if scores[best][1] > scores[i][1]:
+                best = i
+            elif scores[best][1] == scores[i][1]:
+                if scores[best][2] < scores[i][2]:
+                    best = i
+
+    if depth == 0:
+        print()
+        print(depth, scores)
+        print()
+                
+
+    return scores[best] 
 
 def convertToCv2(img):
     img = img.convert('RGB') 
@@ -261,6 +277,62 @@ def cardNumbers(image, basePath):
 
     return values
 
+def randomCard(status):
+        cards = []
+        for i in range(len(status['decks']['player'])):
+            if status['decks']['player'][i]['values'] is not None:
+                cards.append(status['decks']['player'][i]['values'])
+        for y in range(len(status['board'])):
+            for x in range(len(status['board'][y])):
+                if status['board'][y][x]['values'] is not None:
+                    cards.append(status['board'][y][x]['values'])
+        index = random.randrange(len(cards))
+        return cards[index].copy()
+
+def createPlayData(status):
+    board = np.empty(3, dtype=object)
+    for y in range(len(board)):
+        board[y] = np.empty(3, dtype=object)
+
+    newStatus = {
+        'rules': status['rules'],
+        'decks': {
+            'player': [None] * 5,
+            'enemy': [None] * 5
+        }, 
+        'board': [
+            [None] * 3,
+            [None] * 3,
+            [None] * 3
+        ]
+    }
+
+    for i in range(len(status['board'])):
+        for j in range(len(status['board'][i])):
+            newStatus['board'][i][j] = {
+                'values': status['board'][i][j]['values']
+            }
+
+            if newStatus['board'][i][j]['values'] is not None:
+                newStatus['board'][i][j]['owner'] = status['board'][i][j]['owner']
+    for key in status['decks']:
+        for i in range(len(status['decks'][key])):
+            if key == 'player':
+                newStatus['decks'][key][i] = {
+                    'values': status['decks'][key][i]['values'],
+                    'active': status['decks'][key][i]['active']
+                }
+            else:
+                newStatus['decks'][key][i] = {
+                    'values': status['decks'][key][i]['values'],
+                    'hidden': status['decks'][key][i]['hidden']
+                }
+
+                if newStatus['decks'][key][i]['hidden']:
+                    newStatus['decks'][key][i]['values'] = randomCard(status)
+    return newStatus
+
+
 #Handle arguments
 parser = argparse.ArgumentParser(description='Process some integers.')
 parser.add_argument('--debug', action="store_true", help='will write images into the output folder and add extra logs')
@@ -278,15 +350,12 @@ yourTurnTemplate = loadImg('inputs/yourTurnTemplate.png', True)
 
 roundCounter = 0
 
-#Wait for start loop
-if not args.local:
-    while not key1Update():
-        continue
 
 #Main Loop (cancel with ctrl+c)
+yourTurnLast = False
 while True:
     if args.local: 
-        fullScreen = loadImg('inputs/local2.png')
+        fullScreen = loadImg('inputs/local3.png')
     else:
         fullScreen = convertToCv2(ImageGrab.grab())
 
@@ -311,7 +380,11 @@ while True:
         saveImg('outputs', '02_playWindow.png', playWindow)
 
     #Find the your turn indicator
-    yourTurn = cv2.cvtColor(playWindow[35:55, 35:55], cv2.COLOR_BGR2GRAY)
+    yourTurnCrop = playWindow[35:55, 35:55]
+    if yourTurnCrop.shape[0] < 20 or yourTurnCrop.shape[1] < 20:
+        time.sleep(1)
+        continue
+    yourTurn = cv2.cvtColor(yourTurnCrop, cv2.COLOR_BGR2GRAY)
     if args.debug:
         saveImg('outputs', '03_yourTurn.png', yourTurn)
 
@@ -319,8 +392,15 @@ while True:
     similarity = 1 - errorL2 / (20 * 20)
 
     if similarity < 0:
+        yourTurnLast = False
         time.sleep(1)
         continue
+    else:
+        if not yourTurnLast:
+            yourTurnLast = True
+            time.sleep(0.1)
+            continue
+    yourTurnLast = False
     #This code will get executed when the your turn indicator is present
 
     if args.debug:
@@ -336,20 +416,16 @@ while True:
         'chaos': 'Chaos' in rulesString
     }
 
-    print('NOTICE: Enabled Rules: ', rules)
-
     #Setting up data structures
-    board = np.empty(3, dtype=object)
-    for y in range(len(board)):
-        board[y] = np.empty(3, dtype=object)
-
     decks = {
-        'player': np.empty(5, dtype=object),
-        'enemy': np.empty(5, dtype=object)
+        'player': [None] * 5,
+        'enemy': [None] * 5
     }
-        
-    print(board)
-    print(decks)
+    board = [
+        [None] * 3,
+        [None] * 3,
+        [None] * 3
+    ]
 
     cardSize = (91, 119)
     deckCardOffset = (108, 138)
@@ -459,12 +535,40 @@ while True:
         'board': board
     }
 
-
-
-    #Cleanup for next round
     if args.debug:
         with open('outputs/' + str(roundCounter) + '/03_values.json', 'w') as f:
             f.write(json.dumps(status, default=lambda o: o.tolist()))
+
+    status2 = createPlayData(status)
+
+    if args.debug:
+        with open('outputs/' + str(roundCounter) + '/04_playData.json', 'w') as f:
+            f.write(json.dumps(status2))
+
+    emptyBoardSpaces = 0
+    for i in range(len(status2['board'])):
+        for j in range(len(status2['board'][i])):
+            if status2['board'][i][j]['values'] is None:
+                emptyBoardSpaces += 1
+    
+    # variableDepth = 3 + (abs(9 - emptyBoardSpaces) / 2)
+    # print('Starting solver with maxDepth=', variableDepth)
+    move = minmax(status2['board'], status2['decks'], 'player', 0, 3, rules)
+
+    print(move)
+
+    if not args.local:
+        cardPos = status['decks']['player'][move[0][0]]['position']
+        boardPos = status['board'][move[0][2]][move[0][1]]['position']
+        pyautogui.moveTo(top_left[0] + cardPos['x'] + (cardSize[0] / 2), top_left[1] + cardPos['y'] + (cardSize[1] / 2))
+        pyautogui.click()
+        pyautogui.moveTo(top_left[0] + boardPos['x'] + (cardSize[0] / 2), top_left[1] + boardPos['y'] + (cardSize[1] / 2))
+        pyautogui.click()
+        pyautogui.moveTo(top_left[0], top_left[1])
+
+    #Cleanup for next round
+    
+    time.sleep(2)
     roundCounter +=1
     if args.local:
         break
