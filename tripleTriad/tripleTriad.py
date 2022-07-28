@@ -41,12 +41,13 @@ def key0Update():
     key0Old = key0
     return val
 
-def boardFull(board):
+def emptySpaces(board):
+        emptySpaces = 0
         for y in range(len(board)):
             for x in range(len(board[y])):
                 if board[y][x]['values'] is None:
-                    return False
-        return True
+                    emptySpaces += 1
+        return emptySpaces
 
 def getScore(board):
     score = 0
@@ -59,6 +60,16 @@ def getScore(board):
                     score -= 1
     return score
 
+def checkFlip(value1, value2, rules):
+    if rules['reverse']:
+        if rules['fallen']:
+            value1 = value1 % 10
+        return value1 < value2
+        
+    if rules['fallen']:
+        value2 = value2 % 10
+    return value1 > value2
+
 def playCard(board, decks, player, x, y, i, rules):
     board[y][x]['values'] = decks[player][i]['values']
     board[y][x]['owner'] = player
@@ -69,22 +80,22 @@ def playCard(board, decks, player, x, y, i, rules):
 
     if y > 0:
         if board[y - 1][x]['values'] is not None:
-            if board[y][x]['values']['up'] > board[y - 1][x]['values']['down']:
+            if checkFlip(board[y][x]['values']['up'], board[y - 1][x]['values']['down'], rules):
                 board[y - 1][x]['owner'] = player
                 swaps.append([y-1, x])
     if y < 2:
         if board[y + 1][x]['values'] is not None:
-            if board[y][x]['values']['down'] > board[y + 1][x]['values']['up']:
+            if checkFlip(board[y][x]['values']['down'], board[y + 1][x]['values']['up'], rules):
                 board[y + 1][x]['owner'] = player
                 swaps.append([y-1, x])
     if x > 0:
         if board[y][x - 1]['values'] is not None:
-            if board[y][x]['values']['left'] > board[y][x - 1]['values']['right']:
+            if checkFlip(board[y][x]['values']['left'], board[y][x - 1]['values']['right'], rules):
                 board[y][x - 1]['owner'] = player
                 swaps.append([y, x - 1])
     if x < 2:
         if board[y][x + 1]['values'] is not None:
-            if board[y][x]['values']['right'] > board[y][x + 1]['values']['left']:
+            if checkFlip(board[y][x]['values']['right'], board[y][x + 1]['values']['left'], rules):
                 board[y][x + 1]['owner'] = player
                 swaps.append([y, x + 1])
 
@@ -127,7 +138,7 @@ def minmax(board, decks, player, depth, maxDepth, rules):
     for i in range(len(decks[player])):
         if decks[player][i]['values'] is None:
             continue
-        if depth == 0 and rules['chaos'] == True and not decks[player][i]['active']:
+        if depth == 0 and rules['chaos'] and not decks[player][i]['active']:
             continue
         for y in range(len(board)):
             for x in range(len(board[y])):
@@ -142,7 +153,7 @@ def minmax(board, decks, player, depth, maxDepth, rules):
                 # print([[i, x, y], score])
                 # print(board)
 
-                if boardFull(board) or depth >= maxDepth:
+                if emptySpaces(board) <= 0 or depth >= maxDepth:
                     scores.append([[i, x, y], score, exposedValues])
                 else:
                     futureMove = minmax(board, decks, 'enemy' if player == 'player' else 'player', depth + 1, maxDepth, rules)
@@ -150,6 +161,8 @@ def minmax(board, decks, player, depth, maxDepth, rules):
 
                 undoPlay(board, decks, player, x, y, i, swaps)
 
+        if rules['order'] == True:
+            break
     best = None
 
     for i in range(len(scores)):
@@ -160,14 +173,22 @@ def minmax(board, decks, player, depth, maxDepth, rules):
             if scores[best][1] < scores[i][1]:
                 best = i
             elif scores[best][1] == scores[i][1]:
-                if scores[best][2] < scores[i][2]:
-                    best = i
+                if rules['reverse']:
+                    if scores[best][2] > scores[i][2]:
+                        best = i
+                else:
+                    if scores[best][2] < scores[i][2]:
+                        best = i
         else: 
             if scores[best][1] > scores[i][1]:
                 best = i
             elif scores[best][1] == scores[i][1]:
-                if scores[best][2] < scores[i][2]:
-                    best = i
+                if rules['reverse']:
+                    if scores[best][2] > scores[i][2]:
+                        best = i
+                else:
+                    if scores[best][2] < scores[i][2]:
+                        best = i
 
     if depth == 0:
         print()
@@ -337,6 +358,7 @@ def createPlayData(status):
 parser = argparse.ArgumentParser(description='Process some integers.')
 parser.add_argument('--debug', action="store_true", help='will write images into the output folder and add extra logs')
 parser.add_argument('--local', action="store_true", help='start the program with a image from the output folder')
+parser.add_argument('--rematch', action="store_true", help='will rematch an enemy until the program is stopped')
 
 args = parser.parse_args()
 
@@ -413,8 +435,15 @@ while True:
 
     rulesString = pytesseract.image_to_string(ruleView)
     rules = {
-        'chaos': 'Chaos' in rulesString
+        'chaos': 'Chaos' in rulesString,
+        'order': 'Order' in rulesString or 'Orcs' in rulesString,
+        'reverse': 'Reverse' in rulesString,
+        'sudden': 'Sudden' in rulesString,
+        'fallen': 'Fallen' in rulesString
     }
+
+    if args.debug:
+        print(rulesString, rules)
 
     #Setting up data structures
     decks = {
@@ -554,8 +583,10 @@ while True:
     # variableDepth = 3 + (abs(9 - emptyBoardSpaces) / 2)
     # print('Starting solver with maxDepth=', variableDepth)
     move = minmax(status2['board'], status2['decks'], 'player', 0, 3, rules)
-
     print(move)
+
+    playCard(status2['board'], status2['decks'], 'player', move[0][1], move[0][2], move[0][0], rules)
+    
 
     if not args.local:
         cardPos = status['decks']['player'][move[0][0]]['position']
@@ -568,8 +599,20 @@ while True:
 
     #Cleanup for next round
     
+    if emptySpaces(status2['board']) <= 1 and args.rematch:
+        time.sleep(4)
+        pyautogui.press('num0')
+        time.sleep(0.8)
+        pyautogui.press('num0')
+        time.sleep(0.8)
+        pyautogui.press('num0')
+        time.sleep(0.8)
+        pyautogui.press('num0')
+
+
     time.sleep(2)
     roundCounter +=1
+
     if args.local:
         break
 
