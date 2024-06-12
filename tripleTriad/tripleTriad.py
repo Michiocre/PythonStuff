@@ -216,7 +216,7 @@ def loadImg(path, grayscale = False):
     img = cv2.imread(path)
     return cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
-def getCardData(image, basePath):
+def getCardData(cardImg, basePath):
     if args.debug:
         saveImg(basePath, 'fullImage.png', cardImg)
 
@@ -377,7 +377,7 @@ roundCounter = 0
 yourTurnLast = False
 while True:
     if args.local: 
-        fullScreen = loadImg('inputs/local3.png')
+        fullScreen = loadImg('inputs/01_fullScreen.png')
     else:
         fullScreen = convertToCv2(ImageGrab.grab())
 
@@ -488,7 +488,7 @@ while True:
                 errorL2 = cv2.norm(cornerImg, hiddenCardTemplate, cv2.NORM_L2)
                 similarity = abs(1 - errorL2 / (16 * 16))
 
-                decks[key][i]['hidden'] = similarity < 0.1
+                decks[key][i]['hidden'] = similarity < 1
 
 
             if args.debug:
@@ -565,6 +565,9 @@ while True:
     }
 
     if args.debug:
+        print(rules)
+        print(decks)
+        print(board)
         with open('outputs/' + str(roundCounter) + '/03_values.json', 'w') as f:
             f.write(json.dumps(status, default=lambda o: o.tolist()))
 

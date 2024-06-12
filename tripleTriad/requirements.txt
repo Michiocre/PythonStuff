@@ -1,0 +1,6 @@
+numpy
+pyautogui
+pywin32
+opencv-python
+pytesseract
+matplotlib
